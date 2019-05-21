@@ -61,6 +61,89 @@ void error(int i) {
     exit(1);
 }
 
+// 抽象構文木のノードの型の定義
+enum {
+      ND_NUM = 256,   // 整数ノードの型
+};
+
+typedef struct Node {
+    int ty;           // 演算子かND_NUM
+    struct Node *lhs; // 左辺(left-hand side)
+    struct Node *rhs; // 右辺(right-hand side)
+    int val;          // tyがND_NUMの場合のみ使う
+} Node;
+
+// 新しいノードを作成する関数
+Node *new_node(int ty, Node *lhs, Node *rhs) {
+    Node *node = malloc(sizeof(Node));
+    node->ty = ty;
+    node->lhs = lhs;
+    node->rhs = rhs;
+    return node;
+}
+
+Node *new_node_num(int val) {
+    Node *node = malloc(sizeof(Node));
+    node->ty = ND_NUM;
+    node->val = val;
+    return node;
+}
+
+// 次のトークンが期待したかどうかをチェックする関数
+// その場合のみ入力を1トークン進めて真を返す
+int consume(int ty) {
+    if (tokens[pos].ty != ty)
+        return 0;
+    pos++;
+    return 1;
+}
+
+// パーサ
+// add関数
+Node *add() {
+    Node *node = mul();
+
+    for (;;) {
+        if (consume('+'))
+            node =new_node('+', node, mul());
+        else if (consume('-'))
+            node = new_node('-', node, mul());
+        else
+            return node;
+    }
+}
+
+// mul関数
+Node *mul() {
+    Node *node = term();
+
+    for (;;) {
+        if (consume('*'))
+            node = new_node('*', node, term());
+        else if (consume('/'))
+            node = new_node('/', node, term());
+        else
+            return node;
+    }
+}
+
+// term関数
+Node *term() {
+    if (consume('(')) {
+        Node *node = add();
+        if(!consume(')'))
+            error("開きカッコに対応する閉じカッコがありません: %s",
+                  tokens[pos].input);
+        return node;
+    }
+
+    if (tokens[pos].ty == TK_NUM)
+        return new_node_num(tokens[pos++].val);
+
+    error("数値でも開きカッコでもないトークンです: %s",
+          tokens[pos].input);
+}
+
 
 int main(int argc, char **argv) {
     if (argc != 2) {
